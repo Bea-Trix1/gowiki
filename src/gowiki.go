@@ -1,16 +1,11 @@
 package main
 
 import (
-	"fmt"
+	"html/template"
+	"log"
 	"net/http"
 	"os"
 )
-
-func verHandler(w http.ResponseWriter, r *http.Request) {
-	titulo := r.URL.Path[len("/ver/"):]
-	p, _ := carregarPagina(titulo)
-	fmt.Fprintf(w, "<h1>%s</h1><div>%s</div", p.Titulo, p.Corpo)
-}
 
 type Pagina struct {
 	Titulo string
@@ -18,15 +13,53 @@ type Pagina struct {
 }
 
 func main() {
-	p1 := &Pagina{
-		Titulo: "Pagina de Teste",
-		Corpo:  []byte("Olá, essa é uma página de teste."),
+	http.HandleFunc("/ver/", verHandler)
+	http.HandleFunc("/editar/", editarHandler)
+	http.HandleFunc("/salvar/", verHandler)
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func verHandler(w http.ResponseWriter, r *http.Request) {
+	titulo := r.URL.Path[len("/ver/"):]
+	p, error := carregarPagina(titulo)
+	if error != nil {
+		http.Redirect(w, r, "/editar/"+titulo, http.StatusFound)
+		return
+	}
+	renderTemplate(w, "ver", p)
+}
+
+func editarHandler(w http.ResponseWriter, r *http.Request) {
+	titulo := r.URL.Path[len("/editar/"):]
+	p, error := carregarPagina(titulo)
+	if error != nil {
+		p = &Pagina{Titulo: titulo}
 	}
 
-	p1.salvar()
+	renderTemplate(w, "editar", p)
+}
 
-	p2, _ := carregarPagina("Pagina de Teste")
-	fmt.Println(string(p2.Corpo))
+var templates = template.Must(template.ParseFiles("editar.html", "ver.html"))
+
+func renderTemplate(w http.ResponseWriter, tmpl string, p *Pagina) {
+	err := templates.ExecuteTemplate(w, tmpl+".html", p)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func salvarHandler(w http.ResponseWriter, r *http.Request) {
+	titulo := r.URL.Path[len("/salvar/"):]
+	corpo := r.FormValue("corpo")
+
+	p := &Pagina{Titulo: titulo, Corpo: []byte(corpo)}
+	err := p.salvar()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/ver/"+titulo, http.StatusFound)
 }
 
 func (p *Pagina) salvar() error {

@@ -1,0 +1,6 @@
+<h1>Edição {{.Titulo}}</h1> 
+
+<form action="/salvar/{{.Titulo}}" method="POST"> 
+<div><textarea name="corpo" rows="20" cols="80">{{printf "%s" .Corpo}}</textarea></div> 
+<div><input type="submit" value="salvar"></div> 
+</form>
